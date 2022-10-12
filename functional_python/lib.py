@@ -19,12 +19,12 @@ def stack_frame() -> inspect.FrameInfo:
     _stack_frame = inspect.stack()[1]
 
 
-class ClassBuilder:
+class Metaclass:
     def __init__(self, superclass) -> None:
         self.__superclass__ = superclass
 
     def __call__(self, *args, **kwds):
-        cls = SpecialClass(self.__superclass__, *args, **kwds)
+        cls = Class(self.__superclass__, *args, **kwds)
 
         cls.__init__ = _NO_ATTR
 
@@ -42,7 +42,7 @@ class ClassBuilder:
         return cls
 
 
-class SpecialClass:
+class Class:
 
     def __init__(self, superclass, *args, **kwds) -> None:
         if superclass:
@@ -124,21 +124,20 @@ def _sort_code_lines(code_lines: list[str]) -> Iterable[str]:
         yield line
 
 
-def functional_class(f: FunctionType = None, /, *, base=None):
+def functional_class(f: FunctionType = None, /, *, base=None, metaclass=None):
     if not f:
         return functools.partial(
             functional_class,
             base=base,
         )
 
-    return _functional_class_inner(f, base)
+    return _functional_class_inner(f, metaclass or Metaclass, base)
 
 
-def _functional_class_inner(f: FunctionType, base=None):
+def _functional_class_inner(f: FunctionType, metaclass: Metaclass, base=None):
     code_lines = inspect.getsource(f).splitlines()
     sorted = _sort_code_lines(code_lines)
     code = '\n'.join(sorted)
-
     locals_ = {}
 
     g_ = copy(f.__globals__)
@@ -147,9 +146,12 @@ def _functional_class_inner(f: FunctionType, base=None):
     bytecode = compile(code, f.__code__.co_filename, "exec")
     exec(bytecode, g_, locals_)
 
-    locals_[_NAME]()
 
-    out = ClassBuilder(base)
+    new_f = locals_[_NAME]
+    new_f.__code__ = new_f.__code__.replace(co_firstlineno=f.__code__.co_firstlineno - 1)
+    new_f()
+
+    out = metaclass(base)
 
     for key, value in _stack_frame.frame.f_locals.items():
         setattr(out, key, value)
