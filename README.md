@@ -31,7 +31,7 @@ def SubClass():
 cls = Class(10)
 
 print(cls.number)  # 10
-print(cls.method()) # "base_class"
+print(cls.method())  # "base_class"
 print(cls.prop)  # 10
 print(cls.add(5))  # 15
 
