@@ -11,6 +11,8 @@ from typing import Iterable
 
 _stack_frame = None
 
+_NO_ATTR = object()
+
 
 def stack_frame() -> inspect.FrameInfo:
     global _stack_frame
@@ -22,10 +24,9 @@ class ClassBuilder:
         self.__superclass__ = superclass
 
     def __call__(self, *args, **kwds):
-        cls = SpecialClass(self.__superclass__)
+        cls = SpecialClass(self.__superclass__, *args, **kwds)
 
-        cls.__init__ = BoundMethod(cls, lambda s: None)
-
+        cls.__init__ = _NO_ATTR
 
         for key, value in self.__dict__.items():
             if key == "__superclass__":
@@ -35,16 +36,17 @@ class ClassBuilder:
 
             cls.__dict__[key] = value
 
-        cls.__init__(*args, **kwds)
+        if cls.__hasattr__("__init__"):
+            cls.__init__(*args, **kwds)
 
         return cls
 
 
 class SpecialClass:
 
-    def __init__(self, superclass) -> None:
+    def __init__(self, superclass, *args, **kwds) -> None:
         if superclass:
-            self.__superclass__ = superclass(superclass.__superclass__)
+            self.__superclass__ = superclass(*args, **kwds)
         else:
             self.__superclass__ = None
 
@@ -72,9 +74,9 @@ class SpecialClass:
     def __hasattr__(self, name):
         try:
             if super().__getattribute__("__superclass__"):
-                return hasattr(self, name) or super().__hasattr__(super().__getattribute__("__superclass__"), name)
+                return (hasattr(self, name) or super().__hasattr__(super().__getattribute__("__superclass__"), name)) and getattr(self, name) is not _NO_ATTR
             else:
-                return hasattr(self, name)
+                return hasattr(self, name) and getattr(self, name) is not _NO_ATTR
         except AttributeError:
             return False
 
@@ -87,7 +89,9 @@ class BoundMethod:
     def __call__(self, *args, **kwds):
         return self.meth(self.sl, *args, **kwds)
 
+
 _NAME = None
+
 
 def _sort_code_lines(code_lines: list[str]) -> Iterable[str]:
     global _NAME
@@ -139,7 +143,6 @@ def _functional_class_inner(f: FunctionType, base=None):
 
     g_ = copy(f.__globals__)
     g_["__fp__stack_frame__"] = stack_frame
-
 
     bytecode = compile(code, f.__code__.co_filename, "exec")
     exec(bytecode, g_, locals_)
