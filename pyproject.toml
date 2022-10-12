@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "functional-python"
+version = "0.1.0"
+description = "Turns python into a functional language"
+authors = ["Lunarmagpie <bambolambo0@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "functional_python"}]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
